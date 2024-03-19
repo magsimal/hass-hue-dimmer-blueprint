@@ -1,0 +1,58 @@
+blueprint:
+  name: Hue Dimmer Switch (Four Buttons) - Multiple Rooms
+  description: Control multiple groups of Hue lights with a Hue Dimmer Switch with four physical buttons and cycle through scenes in each room.
+  domain: automation
+  input:
+    dimmer_entity:
+      name: Dimmer Entity
+      description: The entity ID of the Hue Dimmer Switch.
+      selector:
+        entity:
+          domain: sensor
+    rooms:
+      name: Rooms
+      description: List of rooms with Hue lights to control.
+      selector:
+        target:
+          entity:
+            domain: light
+    scenes:
+      name: Scenes
+      description: List of scenes to cycle through when the On button is pressed repeatedly.
+      default: []
+      selector:
+        action:
+          entity:
+            domain: scene
+
+trigger:
+  platform: state
+  entity_id: !input dimmer_entity
+
+action:
+  - choose:
+      - conditions:
+          - "{{ trigger.to_state.state == '1_click_up' }}"
+        sequence:
+          - choose:
+              # Toggle the lights on/off
+              - conditions:
+                  - "{{ is_state(!input rooms | map(attribute='entity_id') | list | join(', '), 'on') }}"
+                sequence:
+                  - service: scene.turn_on
+                    target:
+                      entity_id: !input scenes[0]
+              # Cycle through scenes
+              - conditions: 
+                  - "{{ not is_state(!input rooms | map(attribute='entity_id') | list | join(', '), 'on') }}"
+                sequence:
+                  - variables:
+                      room_index: "{{ state_attr('input_select.current_room', 'options').index(state_attr('input_select.current_room', 'state')) }}"
+                      new_scene_index: "{{ state_attr('input_select.current_scene_' + (room_index | string), 'options').index(state_attr('input_select.current_scene_' + (room_index | string), 'state')) + 1 if state_attr('input_select.current_scene_' + (room_index | string), 'options').index(state_attr('input_select.current_scene_' + (room_index | string), 'state')) < (scenes | count) - 1 else 0 }}"
+                  - service: input_select.select_option
+                    data:
+                      entity_id: input_select.current_scene_{{ room_index }}
+                      option: "{{ state_attr('input_select.current_scene_' + (room_index | string), 'options')[new_scene_index] }}"
+                  - service: scene.turn_on
+                    target:
+                      entity_id: !input scenes[new_scene_index]
