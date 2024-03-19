@@ -20,11 +20,7 @@ blueprint:
       name: Scenes
       description: List of scenes to cycle through when the On button is pressed repeatedly.
       default: []
-      selector:
-        action:
-          entity:
-            domain: scene
-
+      
 trigger:
   platform: state
   entity_id: !input dimmer_entity
